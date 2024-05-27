@@ -57,7 +57,7 @@ def complete_reg(request):
         att_obj = AttestationObject((data['attestationObject']))
         server = getServer()
         auth_data = server.register_complete(
-            request.session.pop('fido_state'),
+            request.session['fido_state'],
             client_data,
             att_obj
         )
@@ -68,6 +68,7 @@ def complete_reg(request):
         uk.owned_by_enterprise = getattr(settings, "MFA_OWNED_BY_ENTERPRISE", False)
         uk.key_type = "FIDO2"
         uk.save()
+        request.session.pop('fido_state')
         return HttpResponse(simplejson.dumps({'status': 'OK'}))
     except Exception as exp:
         import traceback
@@ -77,7 +78,7 @@ def complete_reg(request):
             client.captureException()
         except:
             pass
-        return JsonResponse({'status': 'ERR', "message": "Error on server, please try again later"})
+        return JsonResponse({'status': 'ERR', "message": "Error on server occured, please try again later"})
 
 
 def start(request):
