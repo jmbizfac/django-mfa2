@@ -78,7 +78,7 @@ def complete_reg(request):
             client.captureException()
         except:
             pass
-        return JsonResponse({'status': 'ERR', "message": "Error on server occured, please try again later"})
+        return JsonResponse({'status': 'ERR', "message": "Error on server occured, please try again later", "details": str(exp)})
 
 
 def start(request):
