@@ -18,6 +18,7 @@ from .Common import get_redirect_url
 from django.utils import timezone
 from django.http import JsonResponse
 
+
 def recheck(request):
     """Starts FIDO2 recheck"""
     context = csrf(request)
@@ -42,7 +43,7 @@ def begin_registeration(request):
     }, getUserCredentials(request.user.username))
     request.session['fido_state'] = state
 
-    return HttpResponse(cbor.encode(registration_data), content_type = 'application/octet-stream')
+    return HttpResponse(cbor.encode(registration_data), content_type='application/octet-stream')
 
 
 @csrf_exempt
@@ -78,7 +79,8 @@ def complete_reg(request):
             client.captureException()
         except:
             pass
-        return JsonResponse({'status': 'ERR', "message": "Error on server occured, please try again later", "details": str(exp)})
+        return JsonResponse(
+            {'status': 'ERR', "message": "Error on server occured, please try again later", "details": str(exp)})
 
 
 def start(request):
@@ -90,7 +92,7 @@ def start(request):
 
 def getUserCredentials(username):
     credentials = []
-    for uk in User_Keys.objects.filter(username = username, key_type = "FIDO2"):
+    for uk in User_Keys.objects.filter(username=username, key_type="FIDO2"):
         credentials.append(AttestedCredentialData(websafe_decode(uk.properties["device"])))
     return credentials
 
@@ -105,7 +107,7 @@ def authenticate_begin(request):
     credentials = getUserCredentials(request.session.get("base_username", request.user.username))
     auth_data, state = server.authenticate_begin(credentials)
     request.session['fido_state'] = state
-    return HttpResponse(cbor.encode(auth_data), content_type = "application/octet-stream")
+    return HttpResponse(cbor.encode(auth_data), content_type="application/octet-stream")
 
 
 @csrf_exempt
@@ -132,7 +134,7 @@ def authenticate_complete(request):
         except ValueError:
             return HttpResponse(simplejson.dumps({'status': "ERR",
                                                   "message": "Wrong challenge received, make sure that this is your security and try again."}),
-                                content_type = "application/json")
+                                content_type="application/json")
         except Exception as excep:
             try:
                 from raven.contrib.django.raven_compat.models import client
@@ -140,17 +142,18 @@ def authenticate_complete(request):
             except:
                 pass
             return HttpResponse(simplejson.dumps({'status': "ERR",
-                                                  "message": excep.message}),
-                                content_type = "application/json")
+                                                  "message": excep.message if hasattr(excep,
+                                                                                      "message") else "An error occured, please try again later."}),
+                                content_type="application/json")
 
         if request.session.get("mfa_recheck", False):
             import time
             request.session["mfa"]["rechecked_at"] = time.time()
             return HttpResponse(simplejson.dumps({'status': "OK"}),
-                                content_type = "application/json")
+                                content_type="application/json")
         else:
             import random
-            keys = User_Keys.objects.filter(username = username, key_type = "FIDO2", enabled = 1)
+            keys = User_Keys.objects.filter(username=username, key_type="FIDO2", enabled=1)
             for k in keys:
                 if AttestedCredentialData(websafe_decode(k.properties["device"])).credential_id == cred.credential_id:
                     k.last_used = timezone.now()
@@ -158,7 +161,7 @@ def authenticate_complete(request):
                     mfa = {"verified": True, "method": "FIDO2", 'id': k.id}
                     if getattr(settings, "MFA_RECHECK", False):
                         mfa["next_check"] = datetime.datetime.timestamp((datetime.datetime.now() + datetime.timedelta(
-                            seconds = random.randint(settings.MFA_RECHECK_MIN, settings.MFA_RECHECK_MAX))))
+                            seconds=random.randint(settings.MFA_RECHECK_MIN, settings.MFA_RECHECK_MAX))))
                     request.session["mfa"] = mfa
                     try:
                         authenticated = request.user.is_authenticated
@@ -168,9 +171,11 @@ def authenticate_complete(request):
                         res = login(request)
                         if not "location" in res: return reset_cookie(request)
                         return HttpResponse(simplejson.dumps({'status': "OK", "redirect": res["location"]}),
-                                            content_type = "application/json")
+                                            content_type="application/json")
                     return HttpResponse(simplejson.dumps({'status': "OK"}),
-                                        content_type = "application/json")
+                                        content_type="application/json")
     except Exception as exp:
-        return HttpResponse(simplejson.dumps({'status': "ERR", "message": exp.message}),
-                            content_type = "application/json")
+        return HttpResponse(simplejson.dumps(
+            {'status': "ERR",
+             "message": exp.message if hasattr(exp, "message") else "An error occured, please try again later."}),
+            content_type="application/json")
